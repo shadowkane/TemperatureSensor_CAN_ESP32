@@ -1,4 +1,9 @@
 # TemperatureSensor_CAN_ESP32
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/shadowkane/TemperatureSensor_CAN_ESP32/workflow.yml?event=push&style=plastic&logo=espressif)
+![GitHub License](https://img.shields.io/github/license/shadowkane/TemperatureSensor_CAN_ESP32)
+![GitHub top language](https://img.shields.io/github/languages/top/shadowkane/TemperatureSensor_CAN_ESP32)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/shadowkane/TemperatureSensor_CAN_ESP32)
+
 ### Description
 
 Temperature sensor device uses CAN protocol build in TTGO ESP32 T-Beam dev board to send tempearature measurements.
