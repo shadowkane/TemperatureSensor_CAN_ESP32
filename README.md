@@ -41,8 +41,19 @@ Temperature sensor device uses CAN protocol build in TTGO ESP32 T-Beam dev board
 
 Device will keep sending measurements every second.
 
+### Design
+![alt text](doc/img/Circuit.jpg "Design")
+
 ### Schematic
-![alt text](doc/img/Circuit.jpg "Schematic")
+![alt text](doc/img/schematic.JPG "Schematic")
+
+### 3D Model
+#### Model 1
+<img src="doc/img/3d model.JPG" alt="drawing" style="width:50%;"/>
+
+#### Model 2
+<img src="doc/img/3d model 2.JPG" alt="drawing" style="width:50%;"/>
+
 
 ### Preparation
 It's recommanded to calibrate the LM335 Sensor by adjusting the potentiometer until you get the correct temperature. To make it easy, the device already prints (via UART) the tempearature value.

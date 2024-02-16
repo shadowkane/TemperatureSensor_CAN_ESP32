@@ -25,10 +25,11 @@ Note: THIS PROJECT IS STILL IN PROGRESS, CHANGES WILL BE MADE
 #include <Arduino.h>
 #include <CAN.h>
 
-#define LM335_PIN 35
+#define LM335_PIN 34
 
-#define CAN_TX  21
-#define CAN_RX  34
+#define CAN_TX  25
+#define CAN_RX  35
+
 // CAN ID: [bit8-bit15] for device type (max device types is 16)
 //         [bit0-bit7] for device id for specific device type (max device per type is 16)
 //          0 is for ECU or master devices
