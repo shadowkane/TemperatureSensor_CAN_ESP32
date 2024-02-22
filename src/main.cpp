@@ -20,13 +20,20 @@ How it works:
 Note: THIS PROJECT IS STILL IN PROGRESS, CHANGES WILL BE MADE
 */
 
+//#define CAN_EN
+//#define ADC_ONE_SHOT
+
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <Arduino.h>
+#ifdef CAN_EN
 #include <CAN.h>
+#endif
+
 
 #define LM335_PIN 34
-
+#ifdef CAN_EN
 #define CAN_TX  25
 #define CAN_RX  35
 
@@ -43,18 +50,43 @@ Note: THIS PROJECT IS STILL IN PROGRESS, CHANGES WILL BE MADE
 // we reserve 1 more byte for future use (in case we need to expand value)
 // 1 byte (reserved) + 2 bytes (data) + 1 byte (reserver) => payload length is 4 bytes
 #define PAYLOAD_LENGTH 4
+#endif
+#ifndef ADC_ONE_SHOT
+#define NBR_CONVERSION_FRAME_PER_PIN  10
+#define SAMPLING_RATE_HZ  20000 //20kHz (ref: soc_caps.h sampling rate range[20kHz - 2MHz])
+#endif
 
-void vPrepareCanFrame(float data, uint8_t *pu8Buffer);
-
+// Global variables
+#ifdef CAN_EN
 uint8_t upCanPayload2Send[PAYLOAD_LENGTH];
+#endif
 int iTempDegital;
 float fTempRaw;
+#ifdef ADC_ONE_SHOT
+int iFilterSize = 100;
+#endif
+#ifndef ADC_ONE_SHOT
+uint8_t pu8AdcPins[] = {LM335_PIN};
+size_t xNbrAdcPins=1;
+adc_continuos_data_t *result = NULL;
+bool bAdcResultReady_flag = false;
+#endif
+int i;
+
+// Functions
+#ifdef CAN_EN
+void vPrepareCanFrame(float data, uint8_t *pu8Buffer);
+#endif
+#ifndef ADC_ONE_SHOT
+void ARDUINO_ISR_ATTR vAdc_continous_complete_isr_fn();
+#endif
 
 void setup() {
   
   // Serial port config
   Serial.begin(115200);
 
+  #ifdef CAN_EN
   // CAN config
   CAN.setPins(CAN_RX, CAN_TX);
   if(CAN.begin(50E3))
@@ -65,15 +97,56 @@ void setup() {
   {
     Serial.println("Failed to initiate CAN");
   }
+  #endif
+
+  // ADC configuration
+  #ifndef ADC_ONE_SHOT
+  //  set resolution to 12bits
+  analogContinuousSetWidth(12);
+  //  set ADC attenuation to 11dB to be able to measure range (150mv - 2450 mv)
+  analogContinuousSetAtten(ADC_11db);
+  //  setup ADC continous mode
+  xNbrAdcPins = sizeof(pu8AdcPins)/sizeof(uint8_t);
+ 
+  analogContinuous(pu8AdcPins, xNbrAdcPins, NBR_CONVERSION_FRAME_PER_PIN, SAMPLING_RATE_HZ, &vAdc_continous_complete_isr_fn);
+  //  Start ADC Continuous conversions
+  analogContinuousStart();
+  #endif
 
   Serial.println("Start Temperature sensor CAN ESP32");
   delay(1000);
 }
 
-int iFilterSize = 100;
-int i;
+
 
 void loop() {
+  
+  #ifndef ADC_ONE_SHOT
+  if(bAdcResultReady_flag){
+    bAdcResultReady_flag = false;
+    Serial.println("ADC complited\n");
+    if (analogContinuousRead(&result, 0)) {
+        // stop ADC continuous mode until we finish processing the current data
+        analogContinuousStop();
+        // we have only one ADC pin so result length is 1
+        Serial.printf("ADC PIN %d data\n", result[0].pin);
+        Serial.printf("ADC Ch %d data\n", result[0].channel);
+        Serial.printf("Avg raw value = %d\n", result[0].avg_read_raw);
+        Serial.printf("Avg milivolts value = %d\n", result[0].avg_read_mvolts);
+        // calculate temperature
+        iTempDegital =  result[0].avg_read_raw;
+        fTempRaw = (float)result[0].avg_read_mvolts;
+        Serial.printf("iTempDegital=%d | TempRaw mV= %.3f | Temp K = %.3f | Temp C = %.3f\n", iTempDegital, fTempRaw, fTempRaw/10, (fTempRaw/10)-273.15);
+        fTempRaw = (fTempRaw/10)-273.15;
+        // start DAC continuous mode again
+        analogContinuousStart();
+    }
+  }
+  // since ADC was stopped, start it again for new cycle
+  delay(1000);
+  #endif
+
+  #ifdef ADC_ONE_SHOT
   // step in mV for 12 bit resolution => step = 3300/(2^12 -1)
   // 2^12-1= 4096-1= 4095
   // for the sake of normalization we will call step a resolution
@@ -88,6 +161,7 @@ void loop() {
   fTempRaw = iTempDegital * 3300 / 4095.0;
   Serial.printf("iTempDegital=%d | TempRaw mV= %.3f | Temp K = %.3f | Temp C = %.3f\n", iTempDegital, fTempRaw, fTempRaw/10, (fTempRaw/10)-273.15);
   fTempRaw = (fTempRaw/10)-273.15;
+  #ifdef CAN_EN
   // prepare payload
   vPrepareCanFrame(fTempRaw, upCanPayload2Send);
 
@@ -97,13 +171,25 @@ void loop() {
     CAN.write(upCanPayload2Send[i]);
   }
   CAN.endPacket(); // send message
-
+  #endif
   //delay(1000);
+  #endif
 }
 
+#ifdef CAN_EN
 void vPrepareCanFrame(float data, uint8_t *pu8Buffer){
   pu8Buffer[0]  = 0x00;
   uint16_t data_decm = data*100.0;
   memcpy(pu8Buffer+1, (uint8_t*)(&data_decm), 2);
   pu8Buffer[3] = 0x00; 
 }
+#endif
+#ifndef ADC_ONE_SHOT
+void ARDUINO_ISR_ATTR vAdc_continous_complete_isr_fn(){
+  // stop ADC continous until the next cycle
+  //analogContinuousStop();
+  bAdcResultReady_flag = true;
+  //Serial.println("test");
+  //adc_continuous_stop(adc_handle[0].adc_continuous_handle);
+}
+#endif
